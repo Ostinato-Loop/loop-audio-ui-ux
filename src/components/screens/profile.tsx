@@ -1,8 +1,20 @@
-import { Settings, BadgeCheck, MapPin, Mic, MessageCircle, Heart, Users, Shield, Sun, Moon, Monitor } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Settings, BadgeCheck, MapPin, Mic, MessageCircle, Heart, Users, Shield, Sun, Moon, Monitor, Copy, ChevronRight, Sparkles } from "lucide-react";
+import { useState } from "react";
 import { useTheme } from "@/components/theme-provider";
+import { me, people } from "@/lib/people";
+import { useLoop } from "@/lib/store";
+
+type Tab = "activity" | "followers" | "following" | "saved";
 
 export function Profile() {
   const { theme, setTheme } = useTheme();
+  const { follows, toggleFollow } = useLoop();
+  const [tab, setTab] = useState<Tab>("activity");
+
+  const followingList = people.filter((p) => follows[p.handle]);
+  const followersList = people.filter((p) => !follows[p.handle]).concat(people.slice(0, 2));
+
   return (
     <div className="pb-24">
       <div className="relative h-32 bg-gradient-to-br from-neon/30 via-accent to-orange/20">
@@ -10,43 +22,74 @@ export function Profile() {
       </div>
       <div className="px-4 -mt-10">
         <div className="flex items-end justify-between">
-          <img src="https://i.pravatar.cc/200?img=47" alt="" className="h-20 w-20 rounded-2xl ring-4 ring-background object-cover" />
+          <img src={me.avatar} alt="" className="h-20 w-20 rounded-2xl ring-4 ring-background object-cover" />
           <button className="px-4 py-1.5 rounded-full bg-foreground text-background text-xs font-bold">Edit profile</button>
         </div>
         <div className="mt-3">
           <div className="flex items-center gap-1.5">
-            <h1 className="text-xl font-extrabold">Adaeze Okafor</h1>
+            <h1 className="text-xl font-extrabold">{me.name}</h1>
             <BadgeCheck className="h-5 w-5 text-neon fill-neon/20" />
           </div>
           <div className="text-xs text-muted-foreground">@adaeze · adaeze@rald.me</div>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1"><MapPin className="h-3 w-3" />Lagos · Lagos State · Nigeria</div>
-          <p className="text-sm mt-2 leading-snug">Civic tech · urban policy nerd · Afrobeats apologist. Building the loop one room at a time.</p>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1"><MapPin className="h-3 w-3" />{me.region}</div>
+          <p className="text-sm mt-2 leading-snug">{me.bio}</p>
         </div>
 
         <div className="grid grid-cols-3 gap-2 mt-4">
-          <Stat label="Rooms joined" value="284" />
-          <Stat label="Followers" value="3.4k" />
-          <Stat label="Trust score" value="92" highlight />
-        </div>
-
-        <div className="mt-5 rounded-2xl border border-border p-4 bg-card">
-          <div className="flex items-center gap-2 mb-3"><Shield className="h-4 w-4 text-neon" /><span className="text-xs font-bold uppercase tracking-wider">RALD Identity</span></div>
-          <div className="space-y-2 text-xs">
-            <Row k="RALD ID" v="rald_8f2c…a91" />
-            <Row k="Mail" v="adaeze@rald.me" />
-            <Row k="Connected apps" v="Loop · Messenger · Mail" />
-            <Row k="Trust badges" v="Verified contributor" />
+          <button onClick={() => setTab("followers")} className={`rounded-2xl p-3 text-center transition ${tab === "followers" ? "bg-secondary ring-2 ring-neon/40" : "bg-secondary"}`}>
+            <div className="text-lg font-extrabold">{fmt(followersList.length * 70 + 100)}</div>
+            <div className="text-[10px] text-muted-foreground">Followers</div>
+          </button>
+          <button onClick={() => setTab("following")} className={`rounded-2xl p-3 text-center transition ${tab === "following" ? "bg-secondary ring-2 ring-neon/40" : "bg-secondary"}`}>
+            <div className="text-lg font-extrabold">{followingList.length || me.following}</div>
+            <div className="text-[10px] text-muted-foreground">Following</div>
+          </button>
+          <div className="rounded-2xl p-3 text-center bg-neon/10 border border-neon/40">
+            <div className="text-lg font-extrabold text-neon">{me.trust}</div>
+            <div className="text-[10px] text-muted-foreground">Trust</div>
           </div>
         </div>
 
+        {/* RALD Identity */}
+        <div className="mt-5 rounded-2xl border border-border p-4 bg-card">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2"><Shield className="h-4 w-4 text-neon" /><span className="text-xs font-bold uppercase tracking-wider">RALD Identity</span></div>
+            <span className="text-[10px] font-bold text-neon">profiles.rald.cloud</span>
+          </div>
+          <div className="space-y-2 text-xs">
+            <IdRow k="RALD ID" v="rald_8f2c…a91" copy />
+            <IdRow k="Mail" v="adaeze@rald.me" copy />
+            <IdRow k="Trust score" v="92 / 100" badge />
+            <IdRow k="Badge" v="Verified contributor" />
+          </div>
+          <div className="mt-3 pt-3 border-t border-border">
+            <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground mb-2">Connected apps</div>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { name: "Loop", on: true, color: "bg-neon/15 text-neon" },
+                { name: "Messenger", on: true, color: "bg-orange/15 text-orange" },
+                { name: "Mail", on: true, color: "bg-secondary text-foreground" },
+                { name: "PayRALD", on: false, color: "bg-secondary text-muted-foreground" },
+                { name: "GitRALD", on: false, color: "bg-secondary text-muted-foreground" },
+              ].map((a) => (
+                <span key={a.name} className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${a.color}`}>{a.on ? "● " : "○ "}{a.name}</span>
+              ))}
+            </div>
+          </div>
+          <button className="mt-3 w-full h-10 rounded-xl bg-secondary text-xs font-bold flex items-center justify-center gap-1.5">
+            Manage on profiles.rald.cloud <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        {/* Appearance */}
         <div className="mt-4 rounded-2xl border border-border p-4 bg-card">
-          <div className="text-xs font-bold uppercase tracking-wider mb-3">Appearance</div>
+          <div className="text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-neon" />Appearance</div>
           <div className="grid grid-cols-3 gap-2">
             {([
               { id: "light", icon: Sun, label: "Light" },
               { id: "dark", icon: Moon, label: "Dark" },
               { id: "system", icon: Monitor, label: "Auto" },
-            ] as const).map(opt => {
+            ] as const).map((opt) => {
               const Icon = opt.icon;
               const active = theme === opt.id;
               return (
@@ -59,17 +102,30 @@ export function Profile() {
           </div>
         </div>
 
+        {/* Tabs */}
         <div className="mt-5">
-          <div className="flex gap-1.5 border-b border-border">
-            {["Activity", "Rooms", "Comments", "Saved"].map((t, i) => (
-              <button key={t} className={`px-3 py-2 text-xs font-semibold border-b-2 ${i === 0 ? "border-neon text-foreground" : "border-transparent text-muted-foreground"}`}>{t}</button>
+          <div className="flex gap-1 border-b border-border overflow-x-auto scrollbar-none">
+            {(["activity", "followers", "following", "saved"] as Tab[]).map((t) => (
+              <button key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-xs font-semibold capitalize border-b-2 whitespace-nowrap ${tab === t ? "border-neon text-foreground" : "border-transparent text-muted-foreground"}`}>{t}</button>
             ))}
           </div>
+
           <div className="mt-3 space-y-2">
-            <Activity icon={Mic} text="Spoke in Lagos Traffic Reform" meta="2h · 38 reactions" />
-            <Activity icon={MessageCircle} text="Top comment in Afrobeats Room" meta="Yesterday · 412 likes" />
-            <Activity icon={Heart} text="Joined University of Lagos room" meta="Mon" />
-            <Activity icon={Users} text="Connected with Wanjiku M." meta="From Nairobi Devs Room" />
+            {tab === "activity" && <>
+              <Activity icon={Mic} text="Spoke in Lagos Traffic Reform" meta="2h · 38 reactions" />
+              <Activity icon={MessageCircle} text="Top comment in Afrobeats Room" meta="Yesterday · 412 likes" />
+              <Activity icon={Heart} text="Joined University of Lagos room" meta="Mon" />
+              <Activity icon={Users} text="Connected with Wanjiku M." meta="From Nairobi Devs Room" />
+            </>}
+            {tab === "following" && (followingList.length ? followingList : people.slice(0, 3)).map((p) => (
+              <PersonRow key={p.handle} p={p} following={!!follows[p.handle]} onToggle={() => toggleFollow(p.handle)} />
+            ))}
+            {tab === "followers" && followersList.slice(0, 6).map((p) => (
+              <PersonRow key={p.handle + "f"} p={p} following={!!follows[p.handle]} onToggle={() => toggleFollow(p.handle)} />
+            ))}
+            {tab === "saved" && (
+              <div className="text-center text-xs text-muted-foreground py-10">Saved rooms, comments and events show up here.</div>
+            )}
           </div>
         </div>
       </div>
@@ -77,16 +133,38 @@ export function Profile() {
   );
 }
 
-function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function PersonRow({ p, following, onToggle }: { p: typeof people[number]; following: boolean; onToggle: () => void }) {
   return (
-    <div className={`rounded-2xl p-3 text-center ${highlight ? "bg-neon/10 border border-neon/40" : "bg-secondary"}`}>
-      <div className={`text-lg font-extrabold ${highlight ? "text-neon" : ""}`}>{value}</div>
-      <div className="text-[10px] text-muted-foreground">{label}</div>
+    <div className="flex items-center gap-3 p-3 rounded-2xl bg-card border border-border">
+      <Link to="/u/$handle" params={{ handle: p.handle }}>
+        <img src={p.avatar} alt="" className="h-11 w-11 rounded-full" />
+      </Link>
+      <Link to="/u/$handle" params={{ handle: p.handle }} className="flex-1 min-w-0">
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-bold truncate">{p.name}</span>
+          {p.verified && <BadgeCheck className="h-3.5 w-3.5 text-neon shrink-0" />}
+        </div>
+        <div className="text-[11px] text-muted-foreground truncate">{p.region}</div>
+        {p.metVia && <div className="text-[10px] text-neon font-semibold mt-0.5">↺ {p.metVia}</div>}
+      </Link>
+      <button onClick={onToggle} className={`px-3 py-1.5 rounded-full text-[11px] font-bold shrink-0 ${following ? "bg-secondary text-foreground" : "bg-neon text-neon-foreground"}`}>
+        {following ? "Following" : "Follow"}
+      </button>
     </div>
   );
 }
-function Row({ k, v }: { k: string; v: string }) {
-  return <div className="flex items-center justify-between"><span className="text-muted-foreground">{k}</span><span className="font-semibold">{v}</span></div>;
+
+function IdRow({ k, v, copy, badge }: { k: string; v: string; copy?: boolean; badge?: boolean }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-muted-foreground">{k}</span>
+      <span className="font-semibold flex items-center gap-1.5">
+        {badge && <span className="h-1.5 w-1.5 rounded-full bg-neon" />}
+        {v}
+        {copy && <Copy className="h-3 w-3 text-muted-foreground" />}
+      </span>
+    </div>
+  );
 }
 function Activity({ icon: Icon, text, meta }: { icon: typeof Mic; text: string; meta: string }) {
   return (
@@ -99,3 +177,4 @@ function Activity({ icon: Icon, text, meta }: { icon: typeof Mic; text: string; 
     </div>
   );
 }
+function fmt(n: number) { return n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n); }
