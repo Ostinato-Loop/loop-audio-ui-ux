@@ -1,15 +1,15 @@
 import { Link } from "@tanstack/react-router";
-import { Settings, BadgeCheck, MapPin, Mic, MessageCircle, Heart, Users, Shield, Sun, Moon, Monitor, Copy, ChevronRight, Sparkles } from "lucide-react";
+import { Settings, BadgeCheck, MapPin, Mic, MessageCircle, Heart, Users, Shield, Sun, Moon, Monitor, Copy, ChevronRight, Sparkles, Bell, BellOff, BellRing } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "@/components/theme-provider";
 import { me, people } from "@/lib/people";
-import { useLoop } from "@/lib/store";
+import { useLoop, type NotifLevel } from "@/lib/store";
 
 type Tab = "activity" | "followers" | "following" | "saved";
 
 export function Profile() {
   const { theme, setTheme } = useTheme();
-  const { follows, toggleFollow } = useLoop();
+  const { follows, toggleFollow, notifPrefs, setNotifPref } = useLoop();
   const [tab, setTab] = useState<Tab>("activity");
 
   const followingList = people.filter((p) => follows[p.handle]);
