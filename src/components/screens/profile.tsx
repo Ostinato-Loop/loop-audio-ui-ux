@@ -1,15 +1,15 @@
 import { Link } from "@tanstack/react-router";
-import { Settings, BadgeCheck, MapPin, Mic, MessageCircle, Heart, Users, Shield, Sun, Moon, Monitor, Copy, ChevronRight, Sparkles } from "lucide-react";
+import { Settings, BadgeCheck, MapPin, Mic, MessageCircle, Heart, Users, Shield, Sun, Moon, Monitor, Copy, ChevronRight, Sparkles, Bell, BellOff, BellRing } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "@/components/theme-provider";
 import { me, people } from "@/lib/people";
-import { useLoop } from "@/lib/store";
+import { useLoop, type NotifLevel } from "@/lib/store";
 
 type Tab = "activity" | "followers" | "following" | "saved";
 
 export function Profile() {
   const { theme, setTheme } = useTheme();
-  const { follows, toggleFollow } = useLoop();
+  const { follows, toggleFollow, notifPrefs, setNotifPref } = useLoop();
   const [tab, setTab] = useState<Tab>("activity");
 
   const followingList = people.filter((p) => follows[p.handle]);
@@ -118,10 +118,10 @@ export function Profile() {
               <Activity icon={Users} text="Connected with Wanjiku M." meta="From Nairobi Devs Room" />
             </>}
             {tab === "following" && (followingList.length ? followingList : people.slice(0, 3)).map((p) => (
-              <PersonRow key={p.handle} p={p} following={!!follows[p.handle]} onToggle={() => toggleFollow(p.handle)} />
+              <PersonRow key={p.handle} p={p} following={!!follows[p.handle]} onToggle={() => toggleFollow(p.handle)} notifLevel={notifPrefs[p.handle] ?? "all"} onNotif={(l) => setNotifPref(p.handle, l)} showNotif />
             ))}
             {tab === "followers" && followersList.slice(0, 6).map((p) => (
-              <PersonRow key={p.handle + "f"} p={p} following={!!follows[p.handle]} onToggle={() => toggleFollow(p.handle)} />
+              <PersonRow key={p.handle + "f"} p={p} following={!!follows[p.handle]} onToggle={() => toggleFollow(p.handle)} notifLevel={notifPrefs[p.handle] ?? "all"} onNotif={(l) => setNotifPref(p.handle, l)} />
             ))}
             {tab === "saved" && (
               <div className="text-center text-xs text-muted-foreground py-10">Saved rooms, comments and events show up here.</div>
@@ -133,23 +133,53 @@ export function Profile() {
   );
 }
 
-function PersonRow({ p, following, onToggle }: { p: typeof people[number]; following: boolean; onToggle: () => void }) {
+function PersonRow({ p, following, onToggle, notifLevel, onNotif, showNotif }: { p: typeof people[number]; following: boolean; onToggle: () => void; notifLevel: NotifLevel; onNotif: (l: NotifLevel) => void; showNotif?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const NIcon = notifLevel === "off" ? BellOff : notifLevel === "all" ? BellRing : Bell;
   return (
-    <div className="flex items-center gap-3 p-3 rounded-2xl bg-card border border-border">
-      <Link to="/u/$handle" params={{ handle: p.handle }}>
-        <img src={p.avatar} alt="" className="h-11 w-11 rounded-full" />
-      </Link>
-      <Link to="/u/$handle" params={{ handle: p.handle }} className="flex-1 min-w-0">
-        <div className="flex items-center gap-1">
-          <span className="text-sm font-bold truncate">{p.name}</span>
-          {p.verified && <BadgeCheck className="h-3.5 w-3.5 text-neon shrink-0" />}
+    <div className="rounded-2xl bg-card border border-border">
+      <div className="flex items-center gap-3 p-3">
+        <Link to="/u/$handle" params={{ handle: p.handle }}>
+          <img src={p.avatar} alt="" className="h-11 w-11 rounded-full" />
+        </Link>
+        <Link to="/u/$handle" params={{ handle: p.handle }} className="flex-1 min-w-0">
+          <div className="flex items-center gap-1">
+            <span className="text-sm font-bold truncate">{p.name}</span>
+            {p.verified && <BadgeCheck className="h-3.5 w-3.5 text-neon shrink-0" />}
+          </div>
+          <div className="text-[11px] text-muted-foreground truncate">{p.region}</div>
+          {p.metVia && <div className="text-[10px] text-neon font-semibold mt-0.5">↺ {p.metVia}</div>}
+        </Link>
+        {showNotif && following && (
+          <button onClick={() => setOpen((v) => !v)} className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${notifLevel === "off" ? "bg-secondary text-muted-foreground" : "bg-neon/15 text-neon"}`} aria-label="Notifications">
+            <NIcon className="h-4 w-4" />
+          </button>
+        )}
+        <button onClick={onToggle} className={`px-3 py-1.5 rounded-full text-[11px] font-bold shrink-0 ${following ? "bg-secondary text-foreground" : "bg-neon text-neon-foreground"}`}>
+          {following ? "Following" : "Follow"}
+        </button>
+      </div>
+      {showNotif && following && open && (
+        <div className="px-3 pb-3 border-t border-border pt-3">
+          <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground mb-2">Notify me about {p.name.split(" ")[0]}</div>
+          <div className="grid grid-cols-4 gap-1.5">
+            {([
+              { id: "all", label: "Everything", I: BellRing },
+              { id: "rooms", label: "Rooms only", I: Mic },
+              { id: "posts", label: "Posts", I: MessageCircle },
+              { id: "off", label: "Muted", I: BellOff },
+            ] as { id: NotifLevel; label: string; I: typeof Bell }[]).map(({ id, label, I }) => {
+              const active = notifLevel === id;
+              return (
+                <button key={id} onClick={() => { onNotif(id); }} className={`flex flex-col items-center gap-1 p-2 rounded-xl border text-[10px] font-semibold ${active ? "border-neon bg-neon/10 text-foreground" : "border-border bg-secondary text-muted-foreground"}`}>
+                  <I className={`h-3.5 w-3.5 ${active ? "text-neon" : ""}`} />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <div className="text-[11px] text-muted-foreground truncate">{p.region}</div>
-        {p.metVia && <div className="text-[10px] text-neon font-semibold mt-0.5">↺ {p.metVia}</div>}
-      </Link>
-      <button onClick={onToggle} className={`px-3 py-1.5 rounded-full text-[11px] font-bold shrink-0 ${following ? "bg-secondary text-foreground" : "bg-neon text-neon-foreground"}`}>
-        {following ? "Following" : "Follow"}
-      </button>
+      )}
     </div>
   );
 }

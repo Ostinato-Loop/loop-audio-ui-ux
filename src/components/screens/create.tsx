@@ -1,8 +1,9 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, Mic, MessageSquare, Calendar, Users, Image as ImageIcon, FileText, MapPin, Globe2, Lock, Hash, X } from "lucide-react";
-import { useState } from "react";
+import { ChevronLeft, Mic, MessageSquare, Calendar, Users, Image as ImageIcon, FileText, MapPin, Globe2, Lock, Hash, X, CheckCircle2, Share2, Radio, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Route } from "@/routes/_app.create.$kind";
 import { categories, userRegion } from "@/lib/mock";
+import { useLoop } from "@/lib/store";
 
 const META: Record<string, { icon: typeof Mic; label: string; cta: string; color: string; bg: string; desc: string; fields: ("title" | "context" | "category" | "scope" | "date" | "location")[] }> = {
   room: { icon: Mic, label: "Audio Room", cta: "Go live", color: "text-neon", bg: "bg-neon/15", desc: "Open the floor. Anyone in your region can join, listen, and request to speak.", fields: ["title", "context", "category", "scope"] },
@@ -18,6 +19,7 @@ export function CreateScreen() {
   const navigate = useNavigate();
   const meta = META[kind] ?? META.room;
   const Icon = meta.icon;
+  const { publishRoom } = useLoop();
 
   const [title, setTitle] = useState("");
   const [context, setContext] = useState("");
@@ -25,14 +27,31 @@ export function CreateScreen() {
   const [scope, setScope] = useState<"city" | "country" | "africa">("city");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const [phase, setPhase] = useState<"compose" | "publishing" | "success">("compose");
+  const [publishedId, setPublishedId] = useState<string>("");
 
   const canSubmit = (!meta.fields.includes("title") || title.trim().length > 3) && context.trim().length > 4;
 
   const submit = () => {
     if (!canSubmit) return;
-    // mockup: go back to feed
-    navigate({ to: "/" });
+    setPhase("publishing");
   };
+
+  // Simulate broadcast
+  useEffect(() => {
+    if (phase !== "publishing") return;
+    const id = (title || context).toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30) || `loop-${Date.now()}`;
+    const t = setTimeout(() => {
+      publishRoom({ id, title: title || "Untitled", category, scope });
+      setPublishedId(id);
+      setPhase("success");
+    }, 1100);
+    return () => clearTimeout(t);
+  }, [phase, title, context, category, scope, publishRoom]);
+
+  if (phase !== "compose") {
+    return <PublishedView phase={phase} kind={kind} meta={meta} title={title} context={context} category={category} scope={scope} publishedId={publishedId} onHome={() => navigate({ to: "/" })} />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -165,3 +184,106 @@ function Field({ label, hint, icon: I, children }: { label: string; hint?: strin
     </div>
   );
 }
+
+type PublishedProps = {
+  phase: "publishing" | "success";
+  kind: string;
+  meta: (typeof META)[string];
+  title: string;
+  context: string;
+  category: string;
+  scope: "city" | "country" | "africa";
+  publishedId: string;
+  onHome: () => void;
+};
+
+function PublishedView({ phase, kind, meta, title, context, category, scope, publishedId, onHome }: PublishedProps) {
+  const Icon = meta.icon;
+  const scopeLabel = scope === "city" ? userRegion.city : scope === "country" ? userRegion.country : "Africa";
+  const cat = categories.find((c) => c.id === category);
+  const isRoom = kind === "room";
+
+  if (phase === "publishing") {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-8 text-center bg-gradient-to-b from-background to-accent/30">
+        <div className={`relative h-20 w-20 rounded-3xl ${meta.bg} flex items-center justify-center mb-5`}>
+          <Icon className={`h-8 w-8 ${meta.color}`} />
+          <span className="absolute inset-0 rounded-3xl border-2 border-neon/60 animate-ping" />
+        </div>
+        <div className="text-xs uppercase font-bold tracking-wider text-neon mb-1.5 flex items-center gap-1.5">
+          <Radio className="h-3 w-3" /> Publishing to {scopeLabel}
+        </div>
+        <div className="text-base font-extrabold">Broadcasting your {meta.label.toLowerCase()}…</div>
+        <div className="text-xs text-muted-foreground mt-1">Fanning out to followers and nearby Loopers</div>
+        <div className="mt-6 w-full max-w-[240px] h-1 rounded-full bg-secondary overflow-hidden">
+          <div className="h-full bg-neon" style={{ animation: "fill 1.1s ease-out forwards" }} />
+        </div>
+        <style>{`@keyframes fill{from{width:0}to{width:100%}}`}</style>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <header className="px-3 py-2.5 flex items-center gap-2">
+        <button onClick={onHome} className="h-9 w-9 rounded-full bg-secondary flex items-center justify-center"><ChevronLeft className="h-5 w-5" /></button>
+      </header>
+      <div className="flex-1 px-6 flex flex-col">
+        <div className="flex flex-col items-center text-center pt-2">
+          <div className="h-16 w-16 rounded-full bg-neon/15 flex items-center justify-center mb-3">
+            <CheckCircle2 className="h-8 w-8 text-neon" />
+          </div>
+          <div className="text-xs uppercase font-bold tracking-wider text-neon">Published</div>
+          <h1 className="text-2xl font-extrabold leading-tight mt-1.5">Your {meta.label.toLowerCase()} is live</h1>
+          <p className="text-sm text-muted-foreground mt-1.5">Visible to {scopeLabel}{cat ? ` · ${cat.emoji} ${cat.label}` : ""}</p>
+        </div>
+
+        <div className="mt-6 rounded-2xl bg-card border border-border overflow-hidden">
+          <div className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              {isRoom && <><span className="h-1.5 w-1.5 rounded-full live-dot" /><span className="text-[10px] font-bold uppercase text-live">Live now</span></>}
+              <span className="text-[10px] uppercase font-bold text-neon tracking-wider">{meta.label}</span>
+              <span className="text-[10px] text-muted-foreground ml-auto">{scopeLabel}</span>
+            </div>
+            <h3 className="text-[15px] font-bold leading-snug mb-1.5">{title || "(no title)"}</h3>
+            <p className="text-xs text-muted-foreground line-clamp-3">{context}</p>
+            <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-[11px]">
+              <span className="text-muted-foreground">loop.rald/{publishedId}</span>
+              <button className="font-bold text-neon flex items-center gap-1"><Share2 className="h-3 w-3" />Share</button>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl bg-secondary/60 border border-border p-3">
+          <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground mb-2 flex items-center gap-1"><Sparkles className="h-3 w-3 text-neon" />Reach so far</div>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <Stat n="142" k="Notified" />
+            <Stat n="18" k="Joining" />
+            <Stat n="3" k="Re-shared" />
+          </div>
+        </div>
+
+        <div className="mt-auto pt-6 pb-4 space-y-2">
+          {isRoom ? (
+            <Link to="/rooms/$roomId" params={{ roomId: "lagos-traffic" }} className="block w-full h-14 rounded-2xl bg-neon text-neon-foreground font-extrabold text-base neon-glow flex items-center justify-center gap-2">
+              <Mic className="h-5 w-5" />Open my room
+            </Link>
+          ) : (
+            <button onClick={onHome} className="w-full h-14 rounded-2xl bg-neon text-neon-foreground font-extrabold text-base neon-glow">View on feed</button>
+          )}
+          <button onClick={onHome} className="w-full h-12 rounded-2xl bg-secondary font-bold text-sm">Done</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Stat({ n, k }: { n: string; k: string }) {
+  return (
+    <div>
+      <div className="text-lg font-extrabold">{n}</div>
+      <div className="text-[10px] text-muted-foreground">{k}</div>
+    </div>
+  );
+}
+

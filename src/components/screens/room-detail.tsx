@@ -1,19 +1,76 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronLeft, Mic, MicOff, Heart, Hand, Share2, MessageCircle, MoreHorizontal, Check } from "lucide-react";
-import { useState } from "react";
+import { ChevronLeft, Mic, MicOff, Heart, Hand, Share2, MessageCircle, MoreHorizontal, Check, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { rooms } from "@/lib/mock";
 import { Route } from "@/routes/_app.rooms.$roomId";
 import { useLoop } from "@/lib/store";
 
+type QueueEntry = { handle: string; name: string; avatar: string; me?: boolean };
+
+const SEED_QUEUE: QueueEntry[] = [
+  { handle: "kola", name: "Kọ́lá A.", avatar: "https://i.pravatar.cc/100?img=11" },
+  { handle: "amaka", name: "Amaka N.", avatar: "https://i.pravatar.cc/100?img=45" },
+  { handle: "biko", name: "Biko O.", avatar: "https://i.pravatar.cc/100?img=58" },
+  { handle: "zola", name: "Zola M.", avatar: "https://i.pravatar.cc/100?img=21" },
+  { handle: "fela", name: "Fẹlá B.", avatar: "https://i.pravatar.cc/100?img=14" },
+];
+
 export function RoomDetail() {
   const { roomId } = Route.useParams();
   const r = rooms.find((x) => x.id === roomId) ?? rooms[0];
-  const { joined, speakState, muted, setJoined, setSpeakState, toggleMute } = useLoop();
+  const { joined, speakState, muted, setJoined, setSpeakState, toggleMute, setQueuePos } = useLoop();
   const isJoined = !!joined[r.id];
   const sState = speakState[r.id] ?? "listener";
-  const isMuted = muted[r.id] !== false; // default true
+  const isMuted = muted[r.id] !== false;
   const [reactions, setReactions] = useState<{ id: number; emoji: string }[]>([]);
   const [showCommentBox, setShowCommentBox] = useState(false);
+  const [showQueue, setShowQueue] = useState(false);
+  const [queue, setQueue] = useState<QueueEntry[]>(SEED_QUEUE);
+  const [tick, setTick] = useState(0);
+
+  // Build the queue with the user inserted when they've raised their hand
+  const liveQueue = useMemo<QueueEntry[]>(() => {
+    if (sState !== "raised") return queue;
+    const myPos = Math.min(queue.length, 2 + (tick % 2));
+    const copy = [...queue];
+    copy.splice(myPos, 0, { handle: "me", name: "You", avatar: "https://i.pravatar.cc/100?img=47", me: true });
+    return copy;
+  }, [queue, sState, tick]);
+
+  // Live simulation: rotate queue, occasionally advance the user
+  useEffect(() => {
+    if (!isJoined) return;
+    const t = setInterval(() => {
+      setTick((x) => x + 1);
+      setQueue((q) => {
+        // someone is let through ~every 8s
+        if (Math.random() < 0.45 && q.length > 1) {
+          const [, ...rest] = q;
+          // occasionally add a new raiser
+          if (Math.random() < 0.6) {
+            const pool = ["zuri", "ife", "tomi", "obi", "ada", "lerato"];
+            const names = ["Zuri K.", "Ifeoma C.", "Tomi A.", "Obi N.", "Ada E.", "Lerato P."];
+            const i = Math.floor(Math.random() * pool.length);
+            return [...rest, { handle: pool[i], name: names[i], avatar: `https://i.pravatar.cc/100?img=${30 + i * 3}` }];
+          }
+          return rest;
+        }
+        return q;
+      });
+    }, 3500);
+    return () => clearInterval(t);
+  }, [isJoined]);
+
+  // Sync user's position into the store + auto-promote when they reach #1
+  useEffect(() => {
+    if (sState !== "raised") return;
+    const idx = liveQueue.findIndex((q) => q.me);
+    setQueuePos(r.id, idx + 1);
+    if (idx === 0) {
+      const t = setTimeout(() => setSpeakState(r.id, "speaker"), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [liveQueue, sState, r.id, setQueuePos, setSpeakState]);
 
   const audience = Array.from({ length: 12 }).map((_, i) => ({ name: `Listener ${i + 1}`, avatar: `https://i.pravatar.cc/100?img=${(i * 4 + 7) % 70}` }));
 
@@ -23,7 +80,6 @@ export function RoomDetail() {
     setTimeout(() => setReactions((rs) => rs.filter((x) => x.id !== id)), 2500);
   };
 
-  // Pre-join lobby
   if (!isJoined) {
     return (
       <div className="min-h-screen flex flex-col bg-gradient-to-b from-background via-background to-accent/30">
@@ -45,7 +101,7 @@ export function RoomDetail() {
             </div>
             <div className="text-left">
               <div className="text-sm font-bold">{r.listeners.toLocaleString()} listening</div>
-              <div className="text-[11px] text-muted-foreground">{r.speakers.length} speakers</div>
+              <div className="text-[11px] text-muted-foreground">{r.speakers.length} speakers · {queue.length} in queue</div>
             </div>
           </div>
           <button
@@ -59,6 +115,8 @@ export function RoomDetail() {
       </div>
     );
   }
+
+  const myPos = liveQueue.findIndex((q) => q.me) + 1;
 
   return (
     <div className="min-h-screen flex flex-col bg-surface">
@@ -75,22 +133,22 @@ export function RoomDetail() {
       </header>
 
       <div className="flex-1 px-4 pt-4 pb-44 space-y-5 relative">
-        {/* Floating reactions */}
         <div className="pointer-events-none fixed bottom-44 right-6 z-40">
           {reactions.map((r) => (
-            <div key={r.id} className="absolute right-0 bottom-0 text-2xl animate-[float_2.5s_ease-out_forwards]" style={{ animation: "float 2.5s ease-out forwards" }}>
-              {r.emoji}
-            </div>
+            <div key={r.id} className="absolute right-0 bottom-0 text-2xl" style={{ animation: "float 2.5s ease-out forwards" }}>{r.emoji}</div>
           ))}
         </div>
-        <style>{`@keyframes float { 0%{transform:translateY(0) scale(1);opacity:1} 100%{transform:translateY(-200px) scale(1.4);opacity:0} }`}</style>
+        <style>{`@keyframes float { 0%{transform:translateY(0) scale(1);opacity:1} 100%{transform:translateY(-200px) scale(1.4);opacity:0} } @keyframes pop { 0%{transform:scale(0.9);opacity:.4} 100%{transform:scale(1);opacity:1}}`}</style>
 
         {sState === "raised" && (
-          <div className="rounded-2xl bg-neon/10 border border-neon/40 p-3 flex items-center gap-2">
-            <Hand className="h-4 w-4 text-neon" />
-            <div className="flex-1 text-xs"><span className="font-bold">You're in the speaker queue.</span> The host will let you in soon.</div>
-            <button onClick={() => setSpeakState(r.id, "listener")} className="text-[11px] font-bold text-muted-foreground">Cancel</button>
-          </div>
+          <button onClick={() => setShowQueue(true)} className="w-full rounded-2xl bg-neon/10 border border-neon/40 p-3 flex items-center gap-2 text-left active:scale-[0.99] transition">
+            <div className="h-9 w-9 rounded-full bg-neon/20 flex items-center justify-center"><Hand className="h-4 w-4 text-neon" /></div>
+            <div className="flex-1 text-xs">
+              <div className="font-bold">You're #{myPos || "—"} in the speaker queue</div>
+              <div className="text-muted-foreground text-[11px]">Live — updating in real time. Tap to see queue.</div>
+            </div>
+            <span className="text-[10px] font-bold text-neon">VIEW</span>
+          </button>
         )}
         {sState === "speaker" && (
           <div className="rounded-2xl bg-live/10 border border-live/40 p-3 flex items-center gap-2">
@@ -132,6 +190,28 @@ export function RoomDetail() {
           </div>
         </section>
 
+        {/* Live Speaker Queue preview */}
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Hand className="h-3 w-3 text-neon" />Speaker queue · {liveQueue.length}
+              <span className="h-1.5 w-1.5 rounded-full live-dot ml-1" />
+            </div>
+            <button onClick={() => setShowQueue(true)} className="text-[10px] text-neon font-semibold">View all</button>
+          </div>
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none -mx-1 px-1">
+            {liveQueue.slice(0, 8).map((q, i) => (
+              <div key={q.handle + i} className="shrink-0 flex flex-col items-center gap-1" style={{ animation: "pop .4s ease-out" }}>
+                <div className="relative">
+                  <img src={q.avatar} alt="" className={`h-11 w-11 rounded-full ${q.me ? "ring-2 ring-neon" : ""}`} />
+                  <span className={`absolute -bottom-0.5 -right-0.5 h-5 w-5 rounded-full text-[10px] font-extrabold flex items-center justify-center border-2 border-background ${i === 0 ? "bg-neon text-neon-foreground" : "bg-secondary text-foreground"}`}>{i + 1}</span>
+                </div>
+                <div className="text-[9px] font-semibold max-w-[52px] truncate text-center">{q.me ? "You" : q.name.split(" ")[0]}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section>
           <div className="flex items-center justify-between mb-3">
             <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">Listeners · {r.listeners.toLocaleString()}</div>
@@ -165,7 +245,40 @@ export function RoomDetail() {
         </section>
       </div>
 
-      {/* Comment composer */}
+      {/* Full queue sheet */}
+      {showQueue && (
+        <div className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm flex items-end" onClick={() => setShowQueue(false)}>
+          <div className="w-full max-w-[480px] mx-auto rounded-t-3xl bg-background border-t border-x border-border max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-background/95 backdrop-blur-xl px-4 py-3 border-b border-border flex items-center justify-between">
+              <div>
+                <div className="text-sm font-extrabold flex items-center gap-2"><Hand className="h-4 w-4 text-neon" />Speaker queue
+                  <span className="h-1.5 w-1.5 rounded-full live-dot" />
+                  <span className="text-[10px] font-bold text-live uppercase">Live</span>
+                </div>
+                <div className="text-[11px] text-muted-foreground">{liveQueue.length} waiting · updates in real time</div>
+              </div>
+              <button onClick={() => setShowQueue(false)} className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center font-bold">×</button>
+            </div>
+            <div className="p-3 space-y-2">
+              {liveQueue.map((q, i) => (
+                <div key={q.handle + i} className={`flex items-center gap-3 p-3 rounded-2xl border transition ${q.me ? "border-neon bg-neon/10" : "border-border bg-card"}`} style={{ animation: "pop .35s ease-out" }}>
+                  <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-extrabold ${i === 0 ? "bg-neon text-neon-foreground" : "bg-secondary"}`}>{i + 1}</div>
+                  <img src={q.avatar} alt="" className="h-10 w-10 rounded-full" />
+                  <div className="flex-1">
+                    <div className="text-sm font-bold">{q.me ? "You" : q.name}</div>
+                    <div className="text-[10px] text-muted-foreground">{i === 0 ? "Next up — host can let in" : `≈ ${i * 40}s wait`}</div>
+                  </div>
+                  {q.me && <span className="text-[10px] font-bold text-neon">YOU</span>}
+                </div>
+              ))}
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground pt-2 px-1">
+                <Users className="h-3 w-3" /> Host controls order. Hosts see raised hands instantly.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showCommentBox && (
         <div className="fixed bottom-[88px] left-0 right-0 z-40 mx-auto max-w-[480px] px-3">
           <div className="rounded-2xl bg-card border border-border p-2 flex items-center gap-2 shadow-xl">
@@ -175,17 +288,15 @@ export function RoomDetail() {
         </div>
       )}
 
-      {/* Sticky action bar */}
       <div className="sticky bottom-0 bg-background/95 backdrop-blur-xl border-t border-border px-3 py-2.5 pb-[max(0.6rem,env(safe-area-inset-bottom))]">
         <div className="flex items-center gap-2">
-          {/* Mic / Speak toggle */}
           {sState === "speaker" ? (
             <button onClick={() => toggleMute(r.id)} className={`h-12 w-12 rounded-full flex items-center justify-center shrink-0 ${isMuted ? "bg-secondary" : "bg-live text-white"}`}>
               {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
             </button>
           ) : sState === "raised" ? (
-            <button onClick={() => setSpeakState(r.id, "speaker")} className="h-12 px-4 rounded-full bg-neon text-neon-foreground text-xs font-bold flex items-center gap-1.5 shrink-0">
-              <Check className="h-4 w-4" />In queue
+            <button onClick={() => setShowQueue(true)} className="h-12 px-4 rounded-full bg-neon/15 text-neon text-xs font-bold flex items-center gap-1.5 shrink-0 border border-neon/40">
+              <Check className="h-4 w-4" />#{myPos || "…"} in queue
             </button>
           ) : (
             <button onClick={() => setSpeakState(r.id, "raised")} className="h-12 px-4 rounded-full bg-neon text-neon-foreground text-xs font-bold flex items-center gap-1.5 shrink-0 neon-glow">
@@ -193,7 +304,6 @@ export function RoomDetail() {
             </button>
           )}
 
-          {/* Reactions */}
           <div className="flex items-center gap-1 flex-1 justify-center">
             {["❤️", "🔥", "👏", "💯", "🙏"].map((e) => (
               <button key={e} onClick={() => sendReaction(e)} className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center text-lg active:scale-90 transition">{e}</button>
