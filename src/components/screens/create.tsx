@@ -1,8 +1,9 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, Mic, MessageSquare, Calendar, Users, Image as ImageIcon, FileText, MapPin, Globe2, Lock, Hash, X } from "lucide-react";
-import { useState } from "react";
+import { ChevronLeft, Mic, MessageSquare, Calendar, Users, Image as ImageIcon, FileText, MapPin, Globe2, Lock, Hash, X, CheckCircle2, Share2, Radio, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Route } from "@/routes/_app.create.$kind";
 import { categories, userRegion } from "@/lib/mock";
+import { useLoop } from "@/lib/store";
 
 const META: Record<string, { icon: typeof Mic; label: string; cta: string; color: string; bg: string; desc: string; fields: ("title" | "context" | "category" | "scope" | "date" | "location")[] }> = {
   room: { icon: Mic, label: "Audio Room", cta: "Go live", color: "text-neon", bg: "bg-neon/15", desc: "Open the floor. Anyone in your region can join, listen, and request to speak.", fields: ["title", "context", "category", "scope"] },
@@ -18,6 +19,7 @@ export function CreateScreen() {
   const navigate = useNavigate();
   const meta = META[kind] ?? META.room;
   const Icon = meta.icon;
+  const { publishRoom } = useLoop();
 
   const [title, setTitle] = useState("");
   const [context, setContext] = useState("");
@@ -25,14 +27,31 @@ export function CreateScreen() {
   const [scope, setScope] = useState<"city" | "country" | "africa">("city");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const [phase, setPhase] = useState<"compose" | "publishing" | "success">("compose");
+  const [publishedId, setPublishedId] = useState<string>("");
 
   const canSubmit = (!meta.fields.includes("title") || title.trim().length > 3) && context.trim().length > 4;
 
   const submit = () => {
     if (!canSubmit) return;
-    // mockup: go back to feed
-    navigate({ to: "/" });
+    setPhase("publishing");
   };
+
+  // Simulate broadcast
+  useEffect(() => {
+    if (phase !== "publishing") return;
+    const id = (title || context).toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30) || `loop-${Date.now()}`;
+    const t = setTimeout(() => {
+      publishRoom({ id, title: title || "Untitled", category, scope });
+      setPublishedId(id);
+      setPhase("success");
+    }, 1100);
+    return () => clearTimeout(t);
+  }, [phase, title, context, category, scope, publishRoom]);
+
+  if (phase !== "compose") {
+    return <PublishedView phase={phase} kind={kind} meta={meta} title={title} context={context} category={category} scope={scope} publishedId={publishedId} onHome={() => navigate({ to: "/" })} />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
