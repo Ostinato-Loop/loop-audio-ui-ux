@@ -118,10 +118,10 @@ export function Profile() {
               <Activity icon={Users} text="Connected with Wanjiku M." meta="From Nairobi Devs Room" />
             </>}
             {tab === "following" && (followingList.length ? followingList : people.slice(0, 3)).map((p) => (
-              <PersonRow key={p.handle} p={p} following={!!follows[p.handle]} onToggle={() => toggleFollow(p.handle)} />
+              <PersonRow key={p.handle} p={p} following={!!follows[p.handle]} onToggle={() => toggleFollow(p.handle)} notifLevel={notifPrefs[p.handle] ?? "all"} onNotif={(l) => setNotifPref(p.handle, l)} showNotif />
             ))}
             {tab === "followers" && followersList.slice(0, 6).map((p) => (
-              <PersonRow key={p.handle + "f"} p={p} following={!!follows[p.handle]} onToggle={() => toggleFollow(p.handle)} />
+              <PersonRow key={p.handle + "f"} p={p} following={!!follows[p.handle]} onToggle={() => toggleFollow(p.handle)} notifLevel={notifPrefs[p.handle] ?? "all"} onNotif={(l) => setNotifPref(p.handle, l)} />
             ))}
             {tab === "saved" && (
               <div className="text-center text-xs text-muted-foreground py-10">Saved rooms, comments and events show up here.</div>
