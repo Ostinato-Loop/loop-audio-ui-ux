@@ -9,61 +9,194 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as AppProfileRouteImport } from './routes/_app.profile'
+import { Route as AppMessengerRouteImport } from './routes/_app.messenger'
+import { Route as AppDiscoverRouteImport } from './routes/_app.discover'
+import { Route as AppRoomsRoomIdRouteImport } from './routes/_app.rooms.$roomId'
+import { Route as AppMessengerThreadIdRouteImport } from './routes/_app.messenger.$threadId'
 
-const IndexRoute = IndexRouteImport.update({
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProfileRoute = AppProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMessengerRoute = AppMessengerRouteImport.update({
+  id: '/messenger',
+  path: '/messenger',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDiscoverRoute = AppDiscoverRouteImport.update({
+  id: '/discover',
+  path: '/discover',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRoomsRoomIdRoute = AppRoomsRoomIdRouteImport.update({
+  id: '/rooms/$roomId',
+  path: '/rooms/$roomId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMessengerThreadIdRoute = AppMessengerThreadIdRouteImport.update({
+  id: '/$threadId',
+  path: '/$threadId',
+  getParentRoute: () => AppMessengerRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof AppIndexRoute
+  '/discover': typeof AppDiscoverRoute
+  '/messenger': typeof AppMessengerRouteWithChildren
+  '/profile': typeof AppProfileRoute
+  '/messenger/$threadId': typeof AppMessengerThreadIdRoute
+  '/rooms/$roomId': typeof AppRoomsRoomIdRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/discover': typeof AppDiscoverRoute
+  '/messenger': typeof AppMessengerRouteWithChildren
+  '/profile': typeof AppProfileRoute
+  '/': typeof AppIndexRoute
+  '/messenger/$threadId': typeof AppMessengerThreadIdRoute
+  '/rooms/$roomId': typeof AppRoomsRoomIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/_app/discover': typeof AppDiscoverRoute
+  '/_app/messenger': typeof AppMessengerRouteWithChildren
+  '/_app/profile': typeof AppProfileRoute
+  '/_app/': typeof AppIndexRoute
+  '/_app/messenger/$threadId': typeof AppMessengerThreadIdRoute
+  '/_app/rooms/$roomId': typeof AppRoomsRoomIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/discover'
+    | '/messenger'
+    | '/profile'
+    | '/messenger/$threadId'
+    | '/rooms/$roomId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/discover'
+    | '/messenger'
+    | '/profile'
+    | '/'
+    | '/messenger/$threadId'
+    | '/rooms/$roomId'
+  id:
+    | '__root__'
+    | '/_app'
+    | '/_app/discover'
+    | '/_app/messenger'
+    | '/_app/profile'
+    | '/_app/'
+    | '/_app/messenger/$threadId'
+    | '/_app/rooms/$roomId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/': {
+      id: '/_app/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/profile': {
+      id: '/_app/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AppProfileRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/messenger': {
+      id: '/_app/messenger'
+      path: '/messenger'
+      fullPath: '/messenger'
+      preLoaderRoute: typeof AppMessengerRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/discover': {
+      id: '/_app/discover'
+      path: '/discover'
+      fullPath: '/discover'
+      preLoaderRoute: typeof AppDiscoverRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/rooms/$roomId': {
+      id: '/_app/rooms/$roomId'
+      path: '/rooms/$roomId'
+      fullPath: '/rooms/$roomId'
+      preLoaderRoute: typeof AppRoomsRoomIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/messenger/$threadId': {
+      id: '/_app/messenger/$threadId'
+      path: '/$threadId'
+      fullPath: '/messenger/$threadId'
+      preLoaderRoute: typeof AppMessengerThreadIdRouteImport
+      parentRoute: typeof AppMessengerRoute
     }
   }
 }
 
+interface AppMessengerRouteChildren {
+  AppMessengerThreadIdRoute: typeof AppMessengerThreadIdRoute
+}
+
+const AppMessengerRouteChildren: AppMessengerRouteChildren = {
+  AppMessengerThreadIdRoute: AppMessengerThreadIdRoute,
+}
+
+const AppMessengerRouteWithChildren = AppMessengerRoute._addFileChildren(
+  AppMessengerRouteChildren,
+)
+
+interface AppRouteChildren {
+  AppDiscoverRoute: typeof AppDiscoverRoute
+  AppMessengerRoute: typeof AppMessengerRouteWithChildren
+  AppProfileRoute: typeof AppProfileRoute
+  AppIndexRoute: typeof AppIndexRoute
+  AppRoomsRoomIdRoute: typeof AppRoomsRoomIdRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppDiscoverRoute: AppDiscoverRoute,
+  AppMessengerRoute: AppMessengerRouteWithChildren,
+  AppProfileRoute: AppProfileRoute,
+  AppIndexRoute: AppIndexRoute,
+  AppRoomsRoomIdRoute: AppRoomsRoomIdRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
